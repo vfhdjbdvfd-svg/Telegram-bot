@@ -1,5 +1,6 @@
 import os
-import asyncio
+import threading
+from flask import Flask
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
@@ -10,10 +11,19 @@ from telegram.ext import (
     filters
 )
 
-# الحصول على التوكن
-TOKEN = os.environ.get("BOT_TOKEN")
+# 1. إعداد سيرفر وهمي لإبقاء Render شغال
+app = Flask(__name__)
 
-# بيانات الأدمن
+@app.route('/')
+def home():
+    return "Bot @WindowsApp_bot is Online 24/7!"
+
+def run_flask():
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host='0.0.0.0', port=port)
+
+# 2. إعدادات البوت والبيانات
+TOKEN = os.environ.get("BOT_TOKEN")
 ADMIN_ID = 8247949817
 ADMIN_USERNAME = "lo683_3"
 
@@ -24,6 +34,7 @@ def is_admin(user) -> bool:
         return True
     return False
 
+# الأوامر والردود
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     user_ids.add(user.id)
@@ -40,7 +51,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await update.message.reply_text(
-        f"أهلاً بك يا **{user.first_name}** في بوت **@WindowsApp_bot** 🚀\n\nأنا أعمل الآن بنجاح!",
+        f"أهلاً بك يا **{user.first_name}** في بوت **@WindowsApp_bot** 🚀\n\nأنا أعمل الآن بنجاح 24/7!",
         reply_markup=reply_markup,
         parse_mode="Markdown"
     )
@@ -62,7 +73,7 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     
     if query.data == "about_bot":
-        await query.edit_message_text("🤖 بوت يعمل 24/7 لخدمة تطبيقات ويندوز.")
+        await query.edit_message_text("🤖 بوت تطبيقات ويندوز يعمل على مدار الساعة.")
     elif query.data == "count_users" and is_admin(query.from_user):
         await query.edit_message_text(f"📊 إجمالي المشتركين: **{len(user_ids)}**", parse_mode="Markdown")
 
@@ -76,15 +87,19 @@ async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("شكراً لتواصلك! تم استلام رسالتك.")
 
 def main():
-    app = ApplicationBuilder().token(TOKEN).build()
+    # تشغيل السيرفر في مسار منفصل (Thread)
+    threading.Thread(target=run_flask, daemon=True).start()
 
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("admin", admin_panel))
-    app.add_handler(CallbackQueryHandler(button_click))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auto_reply))
+    # تشغيل البوت بنظام Polling
+    telegram_app = ApplicationBuilder().token(TOKEN).build()
 
-    print("Bot is running...")
-    app.run_polling()
+    telegram_app.add_handler(CommandHandler("start", start))
+    telegram_app.add_handler(CommandHandler("admin", admin_panel))
+    telegram_app.add_handler(CallbackQueryHandler(button_click))
+    telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auto_reply))
+
+    print("البوت يعمل الآن بنجاح...")
+    telegram_app.run_polling()
 
 if __name__ == "__main__":
     main()
